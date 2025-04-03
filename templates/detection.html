@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}DeepFake Guard - Detection{% endblock %}
+
+{% block content %}
+<main class="container mx-auto px-6 py-12">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="logo-font text-4xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-12">
+            DeepFake Detection
+        </h1>
+        
+        <!-- Upload Section -->
+        <div class="bg-black/40 p-8 rounded-xl cyber-border backdrop-blur-md mb-12">
+            <div class="mb-6">
+                <label class="block text-cyan-400 text-lg font-semibold mb-4" for="image-upload">
+                    Upload Image for Analysis
+                </label>
+                <input class="w-full p-4 bg-gray-900/50 border border-cyan-900/50 rounded-lg text-gray-300 focus:outline-none focus:border-cyan-400 transition-colors" 
+                       type="file" 
+                       id="image-upload" 
+                       accept="image/*">
+            </div>
+            <button id="analyze-btn" class="bg-gradient-to-r from-cyan-500 to-purple-500 text-white px-8 py-3 rounded-lg hover:from-cyan-600 hover:to-purple-600 transition-all transform hover:scale-105">
+                Analyze Image
+            </button>
+        </div>
+
+        <!-- Processing Indicator (hidden by default) -->
+        <div id="processing-indicator" class="hidden mb-12 text-center">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mb-4"></div>
+            <p class="text-cyan-400">Processing image with DeepFake AI detection...</p>
+        </div>
+
+        <!-- Results Section (hidden by default) -->
+        <div id="results-section" class="hidden">
+            <div class="bg-black/40 p-6 rounded-xl cyber-border backdrop-blur-md mb-8">
+                <h3 class="text-xl font-semibold text-cyan-400 mb-4">Detection Results</h3>
+                <div id="detection-result" class="p-4 rounded-lg mb-4"></div>
+                
+                <div class="grid grid-cols-1 gap-4 mb-4">
+                    <div class="bg-black/30 p-3 rounded-lg">
+                        <div class="text-sm text-gray-400">Deepfake Probability</div>
+                        <div id="deepfake-score" class="text-2xl font-bold text-cyan-400">0%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Original Image -->
+                <div class="bg-black/40 p-6 rounded-xl cyber-border backdrop-blur-md">
+                    <h3 class="text-xl font-semibold text-cyan-400 mb-4">Original Image</h3>
+                    <img id="original-image" src="https://via.placeholder.com/300" alt="Original" class="w-full rounded-lg">
+                </div>
+                <!-- Processed Image -->
+                <div class="bg-black/40 p-6 rounded-xl cyber-border backdrop-blur-md">
+                    <h3 class="text-xl font-semibold text-purple-400 mb-4">Processed Image</h3>
+                    <img id="processed-image" src="https://via.placeholder.com/300" alt="Processed" class="w-full rounded-lg">
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const imageUpload = document.getElementById('image-upload');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const processingIndicator = document.getElementById('processing-indicator');
+        const resultsSection = document.getElementById('results-section');
+        const originalImage = document.getElementById('original-image');
+        const processedImage = document.getElementById('processed-image');
+        const detectionResult = document.getElementById('detection-result');
+        const deepfakeScore = document.getElementById('deepfake-score');
+        
+        let uploadedImage = null;
+        
+        // Handle file selection
+        imageUpload.addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                uploadedImage = e.target.files[0];
+                
+                // Display selected image
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    originalImage.src = e.target.result;
+                };
+                reader.readAsDataURL(uploadedImage);
+            }
+        });
+        
+        // Handle analyze button click
+        analyzeBtn.addEventListener('click', function() {
+            if (!uploadedImage) {
+                alert('Please select an image first.');
+                return;
+            }
+            
+            // Show processing indicator
+            processingIndicator.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            
+            // Create form data for image upload
+            const formData = new FormData();
+            formData.append('image', uploadedImage);
+            
+            // Send to server for analysis
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                processingIndicator.classList.add('hidden');
+                resultsSection.classList.remove('hidden');
+                
+                if (data.status === 'success') {
+                    const result = data.result;
+                    const isDeepfake = result.is_deepfake;
+                    
+                    // Update images
+                    processedImage.src = result.processed_image_url;
+                    
+                    // Set deepfake score
+                    const confidencePercent = Math.round(result.confidence * 100);
+                    deepfakeScore.textContent = confidencePercent + '%';
+                    
+                    // Set result message
+                    if (isDeepfake) {
+                        detectionResult.innerHTML = `
+                            <div class="bg-red-900/50 p-4 rounded-lg border border-red-500">
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                    <span class="text-red-500 font-bold">Deepfake Detected!</span>
+                                </div>
+                                <p class="text-gray-300 mt-2">Our AI has detected this image is likely a deepfake with ${confidencePercent}% confidence.</p>
+                            </div>
+                        `;
+                        
+                        // Apply blur to processed image when deepfake is detected
+                        processedImage.classList.add('blur-sm');
+                    } else {
+                        detectionResult.innerHTML = `
+                            <div class="bg-green-900/50 p-4 rounded-lg border border-green-500">
+                                <div class="flex items-center">
+                                    <svg class="w-6 h-6 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    <span class="text-green-500 font-bold">No Deepfake Detected</span>
+                                </div>
+                                <p class="text-gray-300 mt-2">Our AI has analyzed this image and found no evidence of manipulation. This image appears to be authentic.</p>
+                            </div>
+                        `;
+                        
+                        // Remove blur from processed image
+                        processedImage.classList.remove('blur-sm');
+                    }
+                } else {
+                    // Handle error
+                    detectionResult.innerHTML = `
+                        <div class="bg-yellow-900/50 p-4 rounded-lg border border-yellow-500">
+                            <div class="flex items-center">
+                                <svg class="w-6 h-6 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <span class="text-yellow-500 font-bold">Analysis Error</span>
+                            </div>
+                            <p class="text-gray-300 mt-2">There was an error analyzing the image. Please try again.</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                processingIndicator.classList.add('hidden');
+                alert('Error analyzing image: ' + error);
+            });
+        });
+    });
+</script>
+{% endblock %} 
